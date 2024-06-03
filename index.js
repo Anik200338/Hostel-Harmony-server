@@ -43,7 +43,7 @@ async function run() {
       .collection('upComingMeals');
     // Send a ping to confirm a successful connection
     app.get('/meal', async (req, res) => {
-      const result = await mealsCollection.find().toArray();
+      const result = await upComingMealsCollection.find().toArray();
       res.send(result);
     });
     // app.get('/meals', async (req, res) => {
@@ -51,6 +51,11 @@ async function run() {
     //   res.send(result);
     // });
     app.post('/AddMeal', async (req, res) => {
+      const item = req.body;
+      const result = await mealsCollection.insertOne(item);
+      res.send(result);
+    });
+    app.post('/AddUpcomingMeal', async (req, res) => {
       const item = req.body;
       const result = await upComingMealsCollection.insertOne(item);
       res.send(result);
@@ -63,6 +68,26 @@ async function run() {
       const query = { _id: new ObjectId(id) };
       const deleteResult = await upComingMealsCollection.deleteOne(query);
       res.send({ result, deleteResult });
+    });
+
+    // Get a single room data from db using _id
+    app.get('/singleMeal/:id', async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await upComingMealsCollection.findOne(query);
+      res.send(result);
+    });
+
+    app.post('/likeMeal/:id', async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const update = { $inc: { like: 1 } };
+      const result = await upComingMealsCollection.findOneAndUpdate(
+        query,
+        update,
+        { returnDocument: 'after' }
+      );
+      res.send(result.value);
     });
 
     await client.db('admin').command({ ping: 1 });
