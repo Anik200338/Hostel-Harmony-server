@@ -2,6 +2,7 @@ const express = require('express');
 const app = express();
 const cors = require('cors');
 require('dotenv').config();
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const port = process.env.PORT || 5000;
 
 // middleware
@@ -10,8 +11,8 @@ app.use(
     origin: [
       'http://localhost:5173',
       'http://localhost:5174',
-      'https://bistro-158cb.web.app',
-      'https://bistro-158cb.firebaseapp.com',
+      // 'https://bistro-158cb.web.app',
+      // 'https://bistro-158cb.firebaseapp.com',
     ],
     credentials: true,
     optionsSuccessStatus: 200,
@@ -41,53 +42,24 @@ async function run() {
     const upComingMealsCollection = client
       .db('FoodDb')
       .collection('upComingMeals');
+    const AddReview = client.db('FoodDb').collection('Review');
+    const mealRequestsCollection = client
+      .db('FoodDb')
+      .collection('mealRequests');
+    const userCollection = client.db('FoodDb').collection('users');
+    const packagesCollection = client.db('FoodDb').collection(' packages');
+    const paymentCollection = client.db('FoodDb').collection('payment');
     // Send a ping to confirm a successful connection
+
+    // meal Api
     app.get('/meal', async (req, res) => {
-      const result = await upComingMealsCollection.find().toArray();
+      const result = await mealsCollection.find().toArray();
       res.send(result);
     });
-    // app.get('/meals', async (req, res) => {
-    //   const result = await mealsCollection.find().toArray();
-    //   res.send(result);
-    // });
     app.post('/AddMeal', async (req, res) => {
       const item = req.body;
       const result = await mealsCollection.insertOne(item);
       res.send(result);
-    });
-    app.post('/AddUpcomingMeal', async (req, res) => {
-      const item = req.body;
-      const result = await upComingMealsCollection.insertOne(item);
-      res.send(result);
-    });
-    app.post('/AddMealOfUpComing', async (req, res) => {
-      const item = req.body;
-      console.log('item', item);
-      const result = await mealsCollection.insertOne(item);
-      const id = item.cartId;
-      const query = { _id: new ObjectId(id) };
-      const deleteResult = await upComingMealsCollection.deleteOne(query);
-      res.send({ result, deleteResult });
-    });
-
-    // Get a single room data from db using _id
-    app.get('/singleMeal/:id', async (req, res) => {
-      const id = req.params.id;
-      const query = { _id: new ObjectId(id) };
-      const result = await upComingMealsCollection.findOne(query);
-      res.send(result);
-    });
-
-    app.post('/likeMeal/:id', async (req, res) => {
-      const id = req.params.id;
-      const query = { _id: new ObjectId(id) };
-      const update = { $inc: { like: 1 } };
-      const result = await upComingMealsCollection.findOneAndUpdate(
-        query,
-        update,
-        { returnDocument: 'after' }
-      );
-      res.send(result.value);
     });
 
     await client.db('admin').command({ ping: 1 });
