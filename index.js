@@ -202,17 +202,6 @@ async function run() {
       });
       res.send(result);
     });
-
-    // Upcoming meal api
-    app.get('/UpcomingMeal', async (req, res) => {
-      const result = await upComingMealsCollection.find().toArray();
-      res.send(result);
-    });
-    app.post('/AddUpcomingMeal', async (req, res) => {
-      const item = req.body;
-      const result = await upComingMealsCollection.insertOne(item);
-      res.send(result);
-    });
     app.put('/update/:id', async (req, res) => {
       console.log(req.params.id);
       const query = { _id: new ObjectId(req.params.id) };
@@ -225,6 +214,18 @@ async function run() {
       console.log(result);
       res.send(result);
     });
+
+    // Upcoming meal api
+    app.get('/UpcomingMeal', async (req, res) => {
+      const result = await upComingMealsCollection.find().toArray();
+      res.send(result);
+    });
+    app.post('/AddUpcomingMeal', async (req, res) => {
+      const item = req.body;
+      const result = await upComingMealsCollection.insertOne(item);
+      res.send(result);
+    });
+
     app.post('/AddMealOfUpComing', async (req, res) => {
       const item = req.body;
       console.log('item', item);
