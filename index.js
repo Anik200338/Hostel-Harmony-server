@@ -61,6 +61,13 @@ async function run() {
       const result = await mealsCollection.insertOne(item);
       res.send(result);
     });
+    // singleMeal api
+    app.get('/singleMeal/:id', async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await mealsCollection.findOne(query);
+      res.send(result);
+    });
 
     await client.db('admin').command({ ping: 1 });
     console.log(
