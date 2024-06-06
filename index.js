@@ -124,28 +124,7 @@ async function run() {
       }
     });
 
-    // Upcoming meal api
-    app.get('/UpcomingMeal', async (req, res) => {
-      const result = await upComingMealsCollection.find().toArray();
-      res.send(result);
-    });
-    app.post('/AddUpcomingMeal', async (req, res) => {
-      const item = req.body;
-      const result = await upComingMealsCollection.insertOne(item);
-      res.send(result);
-    });
-    app.post('/AddMealOfUpComing', async (req, res) => {
-      const item = req.body;
-      console.log('item', item);
-      const result = await mealsCollection.insertOne(item);
-      const id = item.cartId;
-      const query = { _id: new ObjectId(id) };
-      const deleteResult = await upComingMealsCollection.deleteOne(query);
-      res.send({ result, deleteResult });
-    });
-
-    // Get a single room data from db using _id
-
+    // Review;
     app.post('/addReview/:id', async (req, res) => {
       const review = req.body;
       const mealId = req.params.id;
@@ -157,14 +136,10 @@ async function run() {
         },
       };
       const query = { _id: new ObjectId(mealId) };
-      const updateReview = await upComingMealsCollection.updateOne(
-        query,
-        updateDoc
-      );
+      const updateReview = await mealsCollection.updateOne(query, updateDoc);
       console.log(updateReview);
       res.send({ result, updateReview });
     });
-
     app.get('/review/:id', async (req, res) => {
       const result = await AddReview.find({
         id: req.params.id,
@@ -175,17 +150,15 @@ async function run() {
       const result = await AddReview.find().toArray();
       res.send(result);
     });
-
     app.get('/ReviewTitle/:id', async (req, res) => {
       const id = req.params.id;
-      const result = await upComingMealsCollection
+      const result = await mealsCollection
         .find({
           _id: new ObjectId(id),
         })
         .toArray();
       res.send(result);
     });
-
     app.delete('/myDelete', async (req, res) => {
       const pop = req.query.pop;
       const _id = req.query._id;
@@ -200,30 +173,44 @@ async function run() {
       };
       const deleteQuery = { _id: new ObjectId(_id) };
       console.log(deleteQuery);
-      const decreasesRecommendationCount =
-        await upComingMealsCollection.updateOne(deleteQuery, decreasesDoc);
+      const decreasesRecommendationCount = await mealsCollection.updateOne(
+        deleteQuery,
+        decreasesDoc
+      );
       res.send(result);
     });
-
     app.get('/MyReviewForMe/:email', async (req, res) => {
       const email = req.params.email;
       const query = { 'User.email': email };
       const result = await AddReview.find(query).toArray();
       res.send(result);
     });
+
     app.get('/MyReviewTitleFor/:id', async (req, res) => {
       const id = req.params.id;
-      const result = await upComingMealsCollection
+      const result = await mealsCollection
         .find({
           _id: new ObjectId(id),
         })
         .toArray();
       res.send(result);
     });
+
     app.get('/UpdateDetails/:id', async (req, res) => {
       const result = await AddReview.findOne({
         _id: new ObjectId(req.params.id),
       });
+      res.send(result);
+    });
+
+    // Upcoming meal api
+    app.get('/UpcomingMeal', async (req, res) => {
+      const result = await upComingMealsCollection.find().toArray();
+      res.send(result);
+    });
+    app.post('/AddUpcomingMeal', async (req, res) => {
+      const item = req.body;
+      const result = await upComingMealsCollection.insertOne(item);
       res.send(result);
     });
     app.put('/update/:id', async (req, res) => {
@@ -238,6 +225,17 @@ async function run() {
       console.log(result);
       res.send(result);
     });
+    app.post('/AddMealOfUpComing', async (req, res) => {
+      const item = req.body;
+      console.log('item', item);
+      const result = await mealsCollection.insertOne(item);
+      const id = item.cartId;
+      const query = { _id: new ObjectId(id) };
+      const deleteResult = await upComingMealsCollection.deleteOne(query);
+      res.send({ result, deleteResult });
+    });
+
+    // Get a single room data from db using _id
 
     app.post('/requestMeal/:id', async (req, res) => {
       const { User } = req.body;
