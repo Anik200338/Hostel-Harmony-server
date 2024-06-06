@@ -214,7 +214,6 @@ async function run() {
       console.log(result);
       res.send(result);
     });
-
     // Upcoming meal api
     app.get('/UpcomingMeal', async (req, res) => {
       const result = await upComingMealsCollection.find().toArray();
@@ -225,7 +224,6 @@ async function run() {
       const result = await upComingMealsCollection.insertOne(item);
       res.send(result);
     });
-
     app.post('/AddMealOfUpComing', async (req, res) => {
       const item = req.body;
       console.log('item', item);
@@ -236,8 +234,7 @@ async function run() {
       res.send({ result, deleteResult });
     });
 
-    // Get a single room data from db using _id
-
+    //  request meal
     app.post('/requestMeal/:id', async (req, res) => {
       const { User } = req.body;
       const id = req.params.id;
@@ -257,7 +254,7 @@ async function run() {
     });
     app.get('/singlereq/:id', async (req, res) => {
       const id = req.params.id;
-      const result = await upComingMealsCollection
+      const result = await mealsCollection
         .find({
           _id: new ObjectId(id),
         })
