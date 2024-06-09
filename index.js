@@ -1,4 +1,5 @@
 const express = require('express');
+const jwt = require('jsonwebtoken');
 const app = express();
 const cors = require('cors');
 require('dotenv').config();
@@ -51,11 +52,60 @@ async function run() {
     const paymentCollection = client.db('FoodDb').collection('payment');
     // Send a ping to confirm a successful connection
 
+    mealsCollection
+      .createIndex({ title: 1, category: 1, email: 1 })
+      .then(() => console.log('Index created on name field'))
+      .catch(err => console.error('Failed to create index:', err));
+
     // meal Api
     app.get('/meal', async (req, res) => {
+      const { search, category, minPrice, maxPrice } = req.query;
+
+      // Construct the query object based on the search parameter
+      const query = {};
+
+      if (search) {
+        query.title = { $regex: search, $options: 'i' };
+      }
+
+      if (category) {
+        switch (category) {
+          case 'breakfast':
+            query.category = 'Breakfast';
+            break;
+          case 'lunch':
+            query.category = 'Lunch';
+            break;
+          case 'dinner':
+            query.category = 'Dinner';
+            break;
+          default:
+            break;
+        }
+      }
+
+      if (minPrice) {
+        query.price = { ...query.price, $gte: parseFloat(minPrice) };
+      }
+
+      if (maxPrice) {
+        query.price = { ...query.price, $lte: parseFloat(maxPrice) };
+      }
+
+      try {
+        // Fetch meals from the database using the constructed query
+        const result = await mealsCollection.find(query).toArray();
+        res.send(result);
+      } catch (error) {
+        console.error('Error fetching meals:', error);
+        res.status(500).send('Error fetching meals');
+      }
+    });
+    app.get('/mealTab', async (req, res) => {
       const result = await mealsCollection.find().toArray();
       res.send(result);
     });
+
     app.post('/AddMeal', async (req, res) => {
       const item = req.body;
       const result = await mealsCollection.insertOne(item);
@@ -216,8 +266,16 @@ async function run() {
     });
     // Upcoming meal api
     app.get('/UpcomingMeal', async (req, res) => {
-      const result = await upComingMealsCollection.find().toArray();
-      res.send(result);
+      try {
+        const result = await upComingMealsCollection
+          .find()
+          .sort({ like: -1 })
+          .toArray();
+        res.send(result);
+      } catch (error) {
+        console.error('Error fetching upcoming meals:', error);
+        res.status(500).send({ message: 'Failed to fetch upcoming meals' });
+      }
     });
     app.post('/AddUpcomingMeal', async (req, res) => {
       const item = req.body;
@@ -249,9 +307,27 @@ async function run() {
     });
 
     app.get('/ServeMeals', async (req, res) => {
-      const result = await mealRequestsCollection.find().toArray();
-      res.send(result);
+      const { search } = req.query;
+      const query = {};
+
+      if (search) {
+        query.$or = [
+          { 'User.email': { $regex: search, $options: 'i' } },
+          { 'User.Name': { $regex: search, $options: 'i' } },
+        ];
+      }
+
+      try {
+        const result = await mealRequestsCollection.find(query).toArray();
+        res.send(result);
+      } catch (error) {
+        console.error('Error fetching ServeMeals:', error);
+        res
+          .status(500)
+          .json({ error: 'An error occurred while fetching ServeMeals' });
+      }
     });
+
     app.get('/singlereq/:id', async (req, res) => {
       const id = req.params.id;
       const result = await mealsCollection
@@ -285,8 +361,8 @@ async function run() {
       });
       res.send(result);
     });
-
-    app.post('/users', async (req, res) => {
+    // user api
+    app.post('/user', async (req, res) => {
       const user = req.body;
       // insert email if user doesnt exists:
       const query = { email: user.email };
@@ -298,8 +374,25 @@ async function run() {
       res.send(result);
     });
     app.get('/users', async (req, res) => {
-      const result = await userCollection.find().toArray();
-      res.send(result);
+      const { search } = req.query;
+      const query = {};
+
+      if (search) {
+        query.$or = [
+          { email: { $regex: search, $options: 'i' } },
+          { name: { $regex: search, $options: 'i' } },
+        ];
+      }
+
+      try {
+        const result = await userCollection.find(query).toArray();
+        res.send(result);
+      } catch (error) {
+        console.error('Error fetching users:', error);
+        res
+          .status(500)
+          .json({ error: 'An error occurred while fetching users' });
+      }
     });
 
     app.get('/users/admin/:email', async (req, res) => {
@@ -324,15 +417,15 @@ async function run() {
       const result = await userCollection.updateOne(filter, updatedDoc);
       res.send(result);
     });
-
+    // package
     app.get('/packages', async (req, res) => {
       const result = await packagesCollection.find().toArray();
       res.send(result);
     });
-    app.get('/singlePack/:id', async (req, res) => {
-      const id = req.params.id;
-      const query = { _id: new ObjectId(id) };
+    app.get('/singlePack/:package', async (req, res) => {
+      const query = { name: req.params.package };
       const result = await packagesCollection.findOne(query);
+      console.log(result);
       res.send(result);
     });
     app.post('/create-payment-intent', async (req, res) => {
@@ -365,13 +458,13 @@ async function run() {
         // Determine badge based on the purchased package
         // Assuming `badge` field exists in the package document
         switch (purchasedPackage.name) {
-          case 'Gold':
+          case 'gold':
             badge = 'gold-badge';
             break;
-          case 'Silver':
+          case 'silver':
             badge = 'silver-badge';
             break;
-          case 'Platinum':
+          case 'platinum':
             badge = 'Platinum-badge';
             break;
           default:
@@ -385,7 +478,7 @@ async function run() {
 
       res.send({ paymentResult });
     });
-
+    // UpComing like api
     app.get('/checkUpComingLike/:id/:email', async (req, res) => {
       const { id, email } = req.params;
       try {
@@ -406,24 +499,166 @@ async function run() {
       const email = req.body.email;
       const query = { _id: new ObjectId(id) };
       const meal = await upComingMealsCollection.findOne(query);
+
       if (!meal) {
         return res.status(404).json({ message: 'Meal not found' });
       }
+
       if (!meal.likedBy) {
         meal.likedBy = [];
       }
+
       if (meal.likedBy.includes(email)) {
         return res
           .status(400)
           .json({ message: 'User has already liked this meal' });
       }
+
       const update = { $inc: { like: 1 }, $push: { likedBy: email } };
-      const result = await upComingMealsCollection.findOneAndUpdate(
+      const updatedMeal = await upComingMealsCollection.findOneAndUpdate(
         query,
         update,
         { returnDocument: 'after' }
       );
-      res.send(result.value);
+
+      if (updatedMeal.like >= 10) {
+        const newMeal = {
+          title: updatedMeal.title,
+          category: updatedMeal.category,
+          image: updatedMeal.image,
+          ingredients: updatedMeal.ingredients,
+          description: updatedMeal.description,
+          price: updatedMeal.price,
+          rating: updatedMeal.rating,
+          postTime: new Date().toLocaleString(),
+          like: 0, // reset likes
+          review: 0, // reset reviews
+          cartId: updatedMeal._id.toString(),
+          admin: {
+            name: updatedMeal.admin.name,
+            image: updatedMeal.admin.image,
+            email: updatedMeal.admin.email,
+          },
+        };
+        delete newMeal._id;
+
+        const result = await mealsCollection.insertOne(newMeal);
+        await upComingMealsCollection.deleteOne(query);
+
+        return res.send({ message: 'Meal added to the regular menu', result });
+      }
+
+      res.send(updatedMeal);
+    });
+    app.get('/AllMeals', async (req, res) => {
+      const sortField = req.query.sortBy || 'like';
+      const sortOrder = req.query.order === 'desc' ? -1 : 1;
+
+      try {
+        const result = await mealsCollection
+          .find()
+          .sort({ [sortField]: sortOrder })
+          .toArray();
+        res.send(result);
+      } catch (error) {
+        res.status(500).send({ error: 'Failed to fetch meals' });
+      }
+    });
+
+    app.delete('/myDeleteMeal/:id', async (req, res) => {
+      try {
+        const mealId = req.params.id;
+        const mealObjectId = new ObjectId(mealId);
+
+        // Delete the meal from the mealsCollection
+        const mealDeleteResult = await mealsCollection.deleteOne({
+          _id: mealObjectId,
+        });
+
+        // Delete the corresponding requests from the mealRequestsCollection
+        const requestDeleteResult = await mealRequestsCollection.deleteMany({
+          id: mealId,
+        });
+
+        // Delete the corresponding reviews from the reviewsCollection
+        const reviewsDeleteResult = await AddReview.deleteMany({
+          id: mealId,
+        });
+
+        console.log('Meal Delete Result:', mealDeleteResult);
+        console.log('Request Delete Result:', requestDeleteResult);
+        console.log('Reviews Delete Result:', reviewsDeleteResult);
+
+        res.send({
+          mealDeleteResult,
+          requestDeleteResult,
+          reviewsDeleteResult,
+          acknowledged:
+            mealDeleteResult.acknowledged &&
+            requestDeleteResult.acknowledged &&
+            reviewsDeleteResult.acknowledged,
+          deletedCount:
+            mealDeleteResult.deletedCount +
+            requestDeleteResult.deletedCount +
+            reviewsDeleteResult.deletedCount,
+        });
+      } catch (error) {
+        console.error('Error deleting meal, requests, and reviews:', error);
+        res.status(500).send({
+          error:
+            'An error occurred while deleting the meal, requests, and reviews',
+        });
+      }
+    });
+
+    app.get('/UpdateDetailsMeal/:id', async (req, res) => {
+      const result = await mealsCollection.findOne({
+        _id: new ObjectId(req.params.id),
+      });
+      res.send(result);
+    });
+    app.put('/updateMeal/:id', async (req, res) => {
+      console.log(req.params.id);
+      const query = { _id: new ObjectId(req.params.id) };
+      const data = {
+        $set: {
+          title: req.body.title,
+          category: req.body.category,
+          image: req.body.image,
+          ingredients: req.body.ingredients,
+          description: req.body.description,
+          price: req.body.price,
+          rating: req.body.rating,
+          postTime: req.body.postTime,
+          like: req.body.like,
+          review: req.body.review,
+        },
+      };
+      const result = await mealsCollection.updateOne(query, data);
+      console.log(result);
+      res.send(result);
+    });
+
+    app.get('/AdminProfile/:email', async (req, res) => {
+      const email = req.params.email;
+      const query = {
+        email: email,
+      };
+      const result = await userCollection.find(query).toArray();
+      res.send(result);
+    });
+    app.get('/paymentHistory/:email', async (req, res) => {
+      const email = req.params.email;
+      const query = {
+        email: email,
+      };
+      const result = await paymentCollection.find(query).toArray();
+      res.send(result);
+    });
+    app.get('/mealCount', async (req, res) => {
+      const cursor = mealsCollection.find();
+      const result = await cursor.toArray();
+      res.send(result);
     });
 
     await client.db('admin').command({ ping: 1 });
