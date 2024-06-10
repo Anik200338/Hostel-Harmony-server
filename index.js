@@ -12,8 +12,8 @@ app.use(
     origin: [
       'http://localhost:5173',
       'http://localhost:5174',
-      'https://bistro-158cb.web.app',
-      'https://bistro-158cb.firebaseapp.com',
+      'https://assignment-12-2d5b0.web.app',
+      'https://assignment-12-2d5b0.firebaseapp.com',
     ],
   })
 );
