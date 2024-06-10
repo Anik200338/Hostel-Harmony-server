@@ -12,18 +12,12 @@ app.use(
     origin: [
       'http://localhost:5173',
       'http://localhost:5174',
-      // 'https://bistro-158cb.web.app',
-      // 'https://bistro-158cb.firebaseapp.com',
+      'https://bistro-158cb.web.app',
+      'https://bistro-158cb.firebaseapp.com',
     ],
-    credentials: true,
-    optionsSuccessStatus: 200,
   })
 );
 app.use(express.json());
-
-// Food;
-// EZievSc9UgqWWiOJ;
-
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.scvnlgi.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
@@ -56,6 +50,43 @@ async function run() {
       .createIndex({ title: 1, category: 1, email: 1 })
       .then(() => console.log('Index created on name field'))
       .catch(err => console.error('Failed to create index:', err));
+
+    // jwt related api
+    app.post('/jwt', async (req, res) => {
+      const user = req.body;
+      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
+        expiresIn: '7d',
+      });
+      res.send({ token });
+    });
+
+    // middlewares
+    const verifyToken = (req, res, next) => {
+      console.log('inside verify token', req.headers.authorization);
+      if (!req.headers.authorization) {
+        return res.status(401).send({ message: 'unauthorized access' });
+      }
+      const token = req.headers.authorization.split(' ')[1];
+      jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+        if (err) {
+          return res.status(401).send({ message: 'unauthorized access' });
+        }
+        req.decoded = decoded;
+        next();
+      });
+    };
+
+    // use verify admin after verifyToken
+    const verifyAdmin = async (req, res, next) => {
+      const email = req.decoded.email;
+      const query = { email: email };
+      const user = await userCollection.findOne(query);
+      const isAdmin = user?.role === 'admin';
+      if (!isAdmin) {
+        return res.status(403).send({ message: 'forbidden access' });
+      }
+      next();
+    };
 
     // meal Api
     app.get('/meal', async (req, res) => {
@@ -106,7 +137,7 @@ async function run() {
       res.send(result);
     });
 
-    app.post('/AddMeal', async (req, res) => {
+    app.post('/AddMeal', verifyToken, verifyAdmin, async (req, res) => {
       const item = req.body;
       const result = await mealsCollection.insertOne(item);
       res.send(result);
@@ -196,7 +227,7 @@ async function run() {
       }).toArray();
       res.send(result);
     });
-    app.get('/AllReview', async (req, res) => {
+    app.get('/AllReview', verifyToken, verifyAdmin, async (req, res) => {
       const result = await AddReview.find().toArray();
       res.send(result);
     });
@@ -229,7 +260,7 @@ async function run() {
       );
       res.send(result);
     });
-    app.get('/MyReviewForMe/:email', async (req, res) => {
+    app.get('/MyReviewForMe/:email', verifyToken, async (req, res) => {
       const email = req.params.email;
       const query = { 'User.email': email };
       const result = await AddReview.find(query).toArray();
@@ -277,7 +308,7 @@ async function run() {
         res.status(500).send({ message: 'Failed to fetch upcoming meals' });
       }
     });
-    app.post('/AddUpcomingMeal', async (req, res) => {
+    app.post('/AddUpcomingMeal', verifyToken, verifyAdmin, async (req, res) => {
       const item = req.body;
       const result = await upComingMealsCollection.insertOne(item);
       res.send(result);
@@ -306,7 +337,7 @@ async function run() {
       res.send(result);
     });
 
-    app.get('/ServeMeals', async (req, res) => {
+    app.get('/ServeMeals', verifyToken, verifyAdmin, async (req, res) => {
       const { search } = req.query;
       const query = {};
 
@@ -346,7 +377,7 @@ async function run() {
       res.send(result);
     });
 
-    app.get('/Requested/:email', async (req, res) => {
+    app.get('/Requested/:email', verifyToken, async (req, res) => {
       const email = req.params.email;
       const query = { 'User.email': email };
       const result = await mealRequestsCollection.find(query).toArray();
@@ -373,7 +404,7 @@ async function run() {
       const result = await userCollection.insertOne(user);
       res.send(result);
     });
-    app.get('/users', async (req, res) => {
+    app.get('/users', verifyToken, verifyAdmin, async (req, res) => {
       const { search } = req.query;
       const query = {};
 
@@ -395,8 +426,11 @@ async function run() {
       }
     });
 
-    app.get('/users/admin/:email', async (req, res) => {
+    app.get('/users/admin/:email', verifyToken, async (req, res) => {
       const email = req.params.email;
+      if (email !== req.decoded.email) {
+        return res.status(403).send({ message: 'forbidden access' });
+      }
       const query = { email: email };
       const user = await userCollection.findOne(query);
       let admin = false;
@@ -406,17 +440,6 @@ async function run() {
       res.send({ admin });
     });
 
-    app.patch('/users/admin/:id', async (req, res) => {
-      const id = req.params.id;
-      const filter = { _id: new ObjectId(id) };
-      const updatedDoc = {
-        $set: {
-          role: 'admin',
-        },
-      };
-      const result = await userCollection.updateOne(filter, updatedDoc);
-      res.send(result);
-    });
     // package
     app.get('/packages', async (req, res) => {
       const result = await packagesCollection.find().toArray();
@@ -550,7 +573,7 @@ async function run() {
 
       res.send(updatedMeal);
     });
-    app.get('/AllMeals', async (req, res) => {
+    app.get('/AllMeals', verifyToken, verifyAdmin, async (req, res) => {
       const sortField = req.query.sortBy || 'like';
       const sortOrder = req.query.order === 'desc' ? -1 : 1;
 
@@ -647,11 +670,11 @@ async function run() {
       const result = await userCollection.find(query).toArray();
       res.send(result);
     });
-    app.get('/paymentHistory/:email', async (req, res) => {
-      const email = req.params.email;
-      const query = {
-        email: email,
-      };
+    app.get('/paymentHistory/:email', verifyToken, async (req, res) => {
+      const query = { email: req.params.email };
+      if (req.params.email !== req.decoded.email) {
+        return res.status(403).send({ message: 'forbidden access' });
+      }
       const result = await paymentCollection.find(query).toArray();
       res.send(result);
     });
@@ -660,11 +683,6 @@ async function run() {
       const result = await cursor.toArray();
       res.send(result);
     });
-
-    await client.db('admin').command({ ping: 1 });
-    console.log(
-      'Pinged your deployment. You successfully connected to MongoDB!'
-    );
   } finally {
     // Ensures that the client will close when you finish/error
   }
